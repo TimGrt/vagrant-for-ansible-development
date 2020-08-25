@@ -1,0 +1,52 @@
+---
+
+- name: Prepare localhost
+  hosts: localhost
+  connection: local
+  tasks:
+    - name: Install sshpass, this is required for Ansible ssh connection via password
+      yum:
+        name: sshpass
+        state: present
+    - name: Ensure public key for current User exists
+      stat:
+        path: ~/.ssh/id_rsa.pub
+
+- name: Provision VMs created by Vagrant
+  hosts: vagrant_hosts
+  become: yes
+  vars:
+    ansible_user: vagrant
+    ansible_password: vagrant
+  tasks:
+    - name: Create User for further Ansible automation
+      user:
+        name: "ansible"
+        comment: "User for Ansible automation tasks"
+
+    - name: Enable sudo permissions for Ansible user
+      copy:
+        content: "ansible ALL=(ALL) NOPASSWD:ALL"
+        dest: /etc/sudoers.d/ansible
+        validate: /usr/sbin/visudo -cf %s
+
+    - name: Add public key of current User to authorized_keys of Ansible User
+      authorized_key:
+        user: ansible
+        state: present
+        key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+
+    - name: Update all packages
+      yum:
+        name: '*'
+        state: latest
+    
+    - name: Assert if host needs rebooting
+      command: needs-restarting -r
+      failed_when: false
+      changed_when: false
+      register: reboot_required
+
+    - name: Reboot Hosts
+      reboot:
+      when: "'Reboot is required' in reboot_required.stdout"
