@@ -5,7 +5,7 @@
   connection: local
   tasks:
     - name: Install sshpass, this is required for Ansible ssh connection via password
-      yum:
+      package:
         name: sshpass
         state: present
     - name: Ensure public key for current User exists
